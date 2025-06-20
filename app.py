@@ -88,12 +88,12 @@ def detect_swing_points(df, window=5):
         # Check for swing high
         is_high = all(df['High'].iloc[i] >= df['High'].iloc[j] for j in range(i - window, i + window + 1) if j != i)
         if is_high:
-            highs.append({'index': i, 'price': df['High'].iloc[i], 'timestamp': df.index[i], 'type': 'swing_high'})
+            highs.append({'index': i, 'price': df['High'].iloc[i], 'timestamp': df.index[i].strftime('%Y-%m-%d %H:%M:%S'), 'type': 'swing_high'})
         
         # Check for swing low
         is_low = all(df['Low'].iloc[i] <= df['Low'].iloc[j] for j in range(i - window, i + window + 1) if j != i)
         if is_low:
-            lows.append({'index': i, 'price': df['Low'].iloc[i], 'timestamp': df.index[i], 'type': 'swing_low'})
+            lows.append({'index': i, 'price': df['Low'].iloc[i], 'timestamp': df.index[i].strftime('%Y-%m-%d %H:%M:%S'), 'type': 'swing_low'})
     
     return highs, lows
 
@@ -128,7 +128,7 @@ def detect_order_blocks(df, window=20):
             next_candle['Close'] > current['High']):
             order_blocks.append({
                 'type': 'bullish_ob', 'high': current['High'], 'low': current['Low'],
-                'timestamp': current.name, 'index': i
+                'timestamp': current.name.strftime('%Y-%m-%d %H:%M:%S'), 'index': i
             })
         
         # Bearish Order Block
@@ -136,7 +136,7 @@ def detect_order_blocks(df, window=20):
               next_candle['Close'] < current['Low']):
             order_blocks.append({
                 'type': 'bearish_ob', 'high': current['High'], 'low': current['Low'],
-                'timestamp': current.name, 'index': i
+                'timestamp': current.name.strftime('%Y-%m-%d %H:%M:%S'), 'index': i
             })
     
     return order_blocks[-10:]
@@ -152,14 +152,14 @@ def detect_fair_value_gaps(df):
         if prev['Low'] > next_candle['High']:
             fvgs.append({
                 'type': 'bullish_fvg', 'high': prev['Low'], 'low': next_candle['High'],
-                'timestamp': current.name, 'index': i
+                'timestamp': current.name.strftime('%Y-%m-%d %H:%M:%S'), 'index': i
             })
         
         # Bearish FVG  
         elif prev['High'] < next_candle['Low']:
             fvgs.append({
                 'type': 'bearish_fvg', 'high': next_candle['Low'], 'low': prev['High'],
-                'timestamp': current.name, 'index': i
+                'timestamp': current.name.strftime('%Y-%m-%d %H:%M:%S'), 'index': i
             })
     
     return fvgs[-20:]
@@ -390,6 +390,7 @@ def get_chart_data():
         symbol = data.get('symbol', '').upper()
         timeframes = data.get('timeframes', ['1d', '4h', '1h', '15m'])
         analysis_period = data.get('analysis_period', '3mo')
+        callback_url = data.get('callback_url')  # Optional webhook URL
         
         if not symbol:
             return jsonify({"error": "Symbol is required"}), 400
@@ -430,6 +431,38 @@ def get_chart_data():
             "fetched_at": datetime.now().isoformat()
         }
         
+        # Send to callback URL if provided (webhook functionality)
+        if callback_url:
+            try:
+                logging.info(f"Sending webhook to {callback_url}")
+                webhook_response = requests.post(
+                    callback_url,
+                    json=response_data,
+                    headers={'Content-Type': 'application/json'},
+                    timeout=30
+                )
+                logging.info(f"Webhook sent, status: {webhook_response.status_code}")
+                
+                return jsonify({
+                    "message": "Analysis completed and sent to webhook",
+                    "webhook_status": webhook_response.status_code,
+                    "analysis_summary": {
+                        "symbol": symbol,
+                        "timeframes": timeframes,
+                        "data_points": sum(tf_data.get('data_points', 0) for tf_data in mtf_analysis.values() if isinstance(tf_data, dict) and 'data_points' in tf_data)
+                    }
+                })
+                
+            except requests.exceptions.RequestException as e:
+                logging.error(f"Webhook failed: {str(e)}")
+                # Return the data even if webhook fails
+                return jsonify({
+                    "message": "Analysis completed but webhook failed",
+                    "webhook_error": str(e),
+                    "data": response_data
+                }), 207  # Multi-status
+        
+        # Return data directly if no callback URL
         return jsonify(response_data)
         
     except Exception as e:
@@ -471,8 +504,8 @@ if __name__ == '__main__':
     print("   • Premium/Discount analysis (Daily/4H)")
     print("   • Multi-timeframe confluence signals")
     
-    # Use environment variable for port (for deployment) or default to 5002 for local
-    port = int(os.environ.get('PORT', 5002))
+    # Use environment variable for port (for deployment) or default to 5003 for local
+    port = int(os.environ.get('PORT', 5003))
     debug = os.environ.get('FLASK_ENV') != 'production'
     
     print(f"\n💡 Starting on port {port} (debug: {debug})")
