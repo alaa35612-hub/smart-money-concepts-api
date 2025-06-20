@@ -1,0 +1,18 @@
+#!/bin/bash
+
+echo "🚀 GitHub Push Commands for jccosta94"
+echo "====================================="
+echo ""
+echo "📋 Copy and paste these commands in your VS Code terminal:"
+echo ""
+echo "# Add GitHub remote"
+echo "git remote add origin https://github.com/jccosta94/smart-money-concepts-api.git"
+echo ""
+echo "# Push to GitHub"
+echo "git branch -M main"
+echo "git push -u origin main"
+echo ""
+echo "🔗 Your repository will be available at:"
+echo "   https://github.com/jccosta94/smart-money-concepts-api"
+echo ""
+echo "🚀 After pushing, deploy on Railway at railway.app"
