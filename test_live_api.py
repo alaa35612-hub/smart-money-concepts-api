@@ -2,9 +2,13 @@
 """
 Test script for live/deployed Smart Money Concepts API
 """
-import requests
 import json
 import sys
+
+import pytest
+import requests
+
+pytestmark = pytest.mark.skip(reason="requires configured base_url fixture for live environment")
 
 def test_live_api(base_url):
     """Test the live API endpoints"""
